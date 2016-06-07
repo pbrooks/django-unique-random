@@ -17,7 +17,7 @@ from .utils import AUTH_USER_MODEL, get_username
 class LoginCode(models.Model):
     user = models.ForeignKey(AUTH_USER_MODEL, related_name='login_codes',
                              editable=False, verbose_name=_('user'))
-    code = models.CharField(max_length=20, editable=False, verbose_name=_('code'))
+    code = models.CharField(max_length=20, editable=False, verbose_name=_('code'), unique=True)
     timestamp = models.DateTimeField(editable=False)
     next = models.TextField(editable=False, blank=True)
 
@@ -64,7 +64,9 @@ class LoginCode(models.Model):
         if not user.is_active:
             return None
 
-        code = cls.generate_code(length=getattr(settings, 'NOPASSWORD_CODE_LENGTH', 20))
+        code = None
+        while not cls.code_is_valid(code):
+            code = cls.generate_code(length=getattr(settings, 'NOPASSWORD_CODE_LENGTH', 20))
         login_code = LoginCode(user=user, code=code)
         if next is not None:
             login_code.next = next
@@ -82,3 +84,9 @@ class LoginCode(models.Model):
         else:
             hashed = m.hexdigest()[:length]
         return hashed
+
+    @classmethod
+    def code_is_valid(cls, code):
+        if not code:
+            return False
+        return LoginCode.objects.filter(code=code).exists()
